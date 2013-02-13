@@ -1,7 +1,8 @@
-#include <Wire.h>
 #include <ADXL345.h>
-#include <SPI.h>
 #include <Ethernet.h>
+#include <FreqMeasure.h>
+#include <SPI.h>
+#include <Wire.h>
 
 // Ethernet Config
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
@@ -16,15 +17,18 @@ double fXg = 0;
 double fYg = 0;
 double fZg = 0;
 double pitch, roll;
-ADXL345 acc;
+ADXL345 Acc;
 
 // Shooter
-int rpm = 0;
+int RPM = 0;
+double sum = 0;
+int count = 0;
 
 // Communications
 char dataStream[14]={0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-void setup(){
+void setup() {
+  // Configure default Serial COM to communicate at 57600 baud
   Serial.begin(57600);
 
   // Initialize Ethernet Server (TCP)
@@ -38,31 +42,39 @@ void setup(){
   Serial.println("Initializing I2C");
 
   // Initialize the accelerometer
-  acc.begin();
-}
-void loop(){
-	anglesCalc();
+  Acc.begin();
   
-  // We still need to confirm that we will be using pitch and not roll.
-  sprintf(dataStream, "%+.2i.%.2u:%.4i\r\n", int(pitch),int(abs(pitch - int(pitch))*100),rpm);
+  // Initialize the Hall Effect sensor
+  hallInit();
+  
+}
+void loop() {
+  // Read from the ADXL345 and convert force vectors into pitch and roll
+  anglesCalc();
+  
+  // Measure frequency from Hall Effect Sensor
+  measureFreq();
+  
+  // We still need to confirm that we will be using pitch and not roll
+  sprintf(dataStream, "%+.2i.%.2u:%.4i\r\n", int(pitch),int(abs(pitch - int(pitch))*100),RPM);
 
-  // Remove prior to competition. For debugging ONLY
-	Serial.println(dataStream);
+  /* Remove prior to competition. For debugging ONLY */
+  Serial.println(dataStream);
 	
-  // listen for incoming clients
+  // Listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
     String clientMsg ="";
-
     if (client.connected()) {
-      //Serial.println("Someone is connected");
-
+      /* Remove prior to competition. For debugging ONLY
+         Serial.println("Someone is connected"); */
       if (client.available()) {
         client.print(dataStream);
+        Serial.println(dataStream);
         
-        // Remove prior to competition. For debugging ONLY
-        Serial.println("Printing");
-      }      
+        /* Remove prior to competition. For debugging ONLY
+           Serial.println("Printing"); */    
+      }
     }
     // Give the Client time to receive the data
     delay(50);
@@ -71,7 +83,7 @@ void loop(){
   }
 }
 
-void anglesCalc(){
+void anglesCalc() {
 	double Xg, Yg, Zg;
 	acc.read(&Xg, &Yg, &Zg);
 
@@ -84,9 +96,28 @@ void anglesCalc(){
 	roll  = (atan2(-fYg, fZg)*180.0)/M_PI;
 	pitch = (atan2(fXg, sqrt(fYg*fYg + fZg*fZg))*180.0)/M_PI;
 }
-
-void sPrintAngles(){
-	Serial.print(dataStream);
+void measureFreq() {
+  /* Remove prior to competition. For debugging ONLY
+     Serial.println(digitalRead(49)); */
+  if (FreqMeasure.available()) {
+    // Average several reading together
+    sum = sum + FreqMeasure.read();
+    count = count + 1;
+    if (count > 30) {
+      double frequency = F_CPU / (sum / count);
+      RPM = (int)frequency * 60;
+      /* Remove prior to competition. For debugging ONLY
+         Serial.println(RPM); */
+      sum = 0;
+      count = 0;
+    }
+  }
 }
 
-
+void hallInit() {
+  // Turn on internal PULL-UP resistor on pin 49
+  digitalWrite(49,HIGH);
+  
+  // Start Frequency Monitor
+  FreqMeasure.begin();
+}
