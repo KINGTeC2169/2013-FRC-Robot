@@ -85,7 +85,7 @@ void loop() {
 
 void anglesCalc() {
 	double Xg, Yg, Zg;
-	acc.read(&Xg, &Yg, &Zg);
+	Acc.read(&Xg, &Yg, &Zg);
 
 	//Low Pass Filter
 	fXg = Xg * alpha + (fXg * (1.0 - alpha));
@@ -105,7 +105,7 @@ void measureFreq() {
     count = count + 1;
     if (count > 30) {
       double frequency = F_CPU / (sum / count);
-      RPM = (int)frequency * 60;
+      RPM = frequency * 60;
       /* Remove prior to competition. For debugging ONLY
          Serial.println(RPM); */
       sum = 0;
