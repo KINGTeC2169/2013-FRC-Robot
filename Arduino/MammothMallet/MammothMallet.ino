@@ -23,6 +23,7 @@ ADXL345 Acc;
 int RPM = 0;
 double sum = 0;
 int count = 0;
+unsigned long time = 0;
 
 // Communications
 char dataStream[14]={0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -60,7 +61,8 @@ void loop() {
 
   /* Remove prior to competition. For debugging ONLY */
   Serial.println(dataStream);
-	
+  Serial.print(millis()-time);
+  Serial.print(" ms");
   // Listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
@@ -81,6 +83,7 @@ void loop() {
     // Close the connection:
     client.stop();
   }
+  delay(100);
 }
 
 void anglesCalc() {
@@ -100,17 +103,23 @@ void measureFreq() {
   /* Remove prior to competition. For debugging ONLY
      Serial.println(digitalRead(49)); */
   if (FreqMeasure.available()) {
+    
     // Average several reading together
     sum = sum + FreqMeasure.read();
     count = count + 1;
-    if (count > 30) {
+    if (count > 15) {
       double frequency = F_CPU / (sum / count);
       RPM = frequency * 60;
+      time = millis();
       /* Remove prior to competition. For debugging ONLY
          Serial.println(RPM); */
       sum = 0;
       count = 0;
-    }
+    } 
+  }
+  unsigned long timeElapsed = millis() - time;
+  if (timeElapsed > 1000){
+      RPM = 0;
   }
 }
 
@@ -121,3 +130,4 @@ void hallInit() {
   // Start Frequency Monitor
   FreqMeasure.begin();
 }
+
